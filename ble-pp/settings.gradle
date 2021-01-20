@@ -1,0 +1,2 @@
+rootProject.name = "ble-pp"
+include ':app'
