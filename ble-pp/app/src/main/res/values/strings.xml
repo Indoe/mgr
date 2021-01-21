@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">pp-ble</string>
-    <string name="ble_uuid">b62aa638-5b3e-11eb-ae93-0242ac130002</string>
+    <string name="ble_uuid">0000feaa-0000-1000-8000-00805f9b34fb</string>
 </resources>

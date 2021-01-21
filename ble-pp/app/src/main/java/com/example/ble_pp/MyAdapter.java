@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.DecimalFormat;
@@ -18,11 +19,11 @@ import java.util.concurrent.TimeUnit;
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
-    private static final String TAG = "<> MyAdapter <>";
-    private static DecimalFormat df = new DecimalFormat("0.0");
+    private static final String TAG = "LOG: <MyAdapter> ";
+    private static DecimalFormat df = new DecimalFormat("0.00");
 
     private static Comparator<ScanResult> SORTING_COMPARATOR = (lhs, rhs) ->
-        lhs.getDevice().getAddress().compareTo(rhs.getDevice().getAddress());
+            lhs.getDevice().getAddress().compareTo(rhs.getDevice().getAddress());
     List<ScanResult> scanResultList;
     Context context;
 
@@ -48,7 +49,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 //        long secondSince = calculateTimestamp(scanResultList.get(position).getTimestampNanos());
 //        myViewHolder.timestamp.setText(String.valueOf(secondSince) + " s");
 
-        double distance = calculateDistance(scanResultList.get(position).getRssi(),scanResultList.get(position).getTxPower());
+        double distance = calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower());
         myViewHolder.rssi.setText(String.valueOf(df.format(distance)) + " m");
 
     }
@@ -58,11 +59,9 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         return scanResultList.size();
     }
 
-    public void addScanResult(ScanResult result)
-    {
-        for(int position = 0; position < scanResultList.size(); position++)
-        {
-            if(scanResultList.get(position).getDevice().getAddress().equals(result.getDevice().getAddress())) {
+    public void addScanResult(ScanResult result) {
+        for (int position = 0; position < scanResultList.size(); position++) {
+            if (scanResultList.get(position).getDevice().getAddress().equals(result.getDevice().getAddress())) {
                 scanResultList.set(position, result);
                 notifyItemChanged(position);
                 return;
@@ -91,14 +90,34 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
     }
 
-    public long calculateTimestamp(long timeNanoseconds){
+    //correctly converting string to byte
+    public byte[] toByteArray(String hexString) {
+        int len = hexString.length();
+        byte[] bytes = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            bytes[i / 2] = (byte) ((Character.digit(hexString.charAt(i), 16) << 4)
+                    + Character.digit(hexString.charAt(i + 1), 16));
+        }
+        return bytes;
+    }
+
+    //check correctly formatted service data (max 31 bytes)
+    public String byteArrayToHexString(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bytes.length; i++) {
+            sb.append(String.format("%02x", bytes[i]));
+        }
+        return sb.toString();
+    }
+
+    public long calculateTimestamp(long timeNanoseconds) {
 
         long actualTime = System.currentTimeMillis() - TimeUnit.MILLISECONDS.convert(SystemClock.elapsedRealtimeNanos() - timeNanoseconds, TimeUnit.NANOSECONDS);
 //        long actualTime = System.currentTimeMillis() - SystemClock.elapsedRealtime() + timeNanoseconds / 1000000;
         return actualTime;
     }
 
-    public void clearScanResult(){
+    public void clearScanResult() {
         scanResultList.clear();
         notifyDataSetChanged();
     }
