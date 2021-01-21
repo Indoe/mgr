@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
-    private static final String TAG = "LOG: <MyAdapter> ";
+    private static final String TAG = "MyAdapter: ";
     private static DecimalFormat df = new DecimalFormat("0.00");
 
     private static Comparator<ScanResult> SORTING_COMPARATOR = (lhs, rhs) ->

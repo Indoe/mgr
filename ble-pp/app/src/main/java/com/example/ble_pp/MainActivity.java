@@ -43,7 +43,7 @@ import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "LOG: <MainActivity> ";
+    private static final String TAG = "MainActivity: ";
     BluetoothManager btManager;
     BluetoothAdapter btAdapter;
     BluetoothLeScanner btScanner;
