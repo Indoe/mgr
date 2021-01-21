@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <Button
+    <Button style="@style/TextAppearance.AppCompat.Widget.Button.Colored"
         android:id="@+id/StartScanButton"
         android:layout_width="wrap_content"
         android:layout_height="50dp"
@@ -15,9 +15,12 @@
         android:text="Start Scanning"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@color/palete3"
+        android:padding="10dp"/>
 
-    <Button
+
+    <Button style="@style/TextAppearance.AppCompat.Widget.Button.Colored"
         android:id="@+id/StopScanButton"
         android:layout_width="wrap_content"
         android:layout_height="50dp"
@@ -27,16 +30,21 @@
         android:text="Stop Scanning"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@color/palete3"
+        android:padding="10dp"/>
 
-    <Button
+    <Button style="@style/TextAppearance.AppCompat.Widget.Button.Colored"
         android:id="@+id/AdvertisingButton"
         android:layout_width="wrap_content"
         android:layout_height="50dp"
         android:layout_marginTop="20dp"
         android:layout_marginLeft="20dp"
         android:layout_marginRight="20dp"
-        android:text="Start Advertising" />
+        android:background="@color/palete3"
+        android:text="Start Advertising"
+        android:padding="10dp"
+        />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/RecyclerViewList"
