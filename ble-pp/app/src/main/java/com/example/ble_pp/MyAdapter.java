@@ -13,16 +13,58 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.lemmingapex.trilateration.NonLinearLeastSquaresSolver;
+import com.lemmingapex.trilateration.TrilaterationFunction;
+
+import org.apache.commons.math3.fitting.leastsquares.LeastSquaresOptimizer;
+import org.apache.commons.math3.fitting.leastsquares.LevenbergMarquardtOptimizer;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
+
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+class LatLngSinglton {
+    private double lattitude;
+    private double longitude;
+
+    public LatLngSinglton(double lattitude, double longitude) {
+        this.lattitude = lattitude;
+        this.longitude = longitude;
+    }
+
+    public double getLattitude() {
+        return lattitude;
+    }
+
+    public void setLattitude(double lattitude) {
+        this.lattitude = lattitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
+    }
+
+    @Override
+    public String toString() {
+        return "LatLngSinglton{" +
+                "lattitude=" + lattitude +
+                ", longitude=" + longitude +
+                '}';
+    }
+}
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
-
+    ArrayList<LatLngSinglton> myLatlongs = new ArrayList<>();
     private static final String TAG = "MyAdapter: ";
     private static DecimalFormat df = new DecimalFormat("0.00");
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
@@ -82,12 +124,10 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         scanResultList.add(result);
         Collections.sort(scanResultList, SORTING_COMPARATOR);
         notifyDataSetChanged();
-
-        convertData();
     }
 
-    public void convertData() {
-        double[][] positions = new double[scanResultList.size()][2];
+    public void convertDataToStringLatLong() {
+        myLatlongs.clear();
         for (int position = 0; position < scanResultList.size(); position++) {
 
             data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
@@ -97,9 +137,11 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
             double latitude = Double.parseDouble(splited[0].replace(",","."));
             double longitude = Double.parseDouble(splited[1].replace(",","."));
 
-            positions[position] = new double[]{latitude, longitude};
+            myLatlongs.add( new LatLngSinglton(latitude, longitude));
 
+            Log.e(TAG, "position " + position + " " + myLatlongs.get(position).toString());
         }
+        Log.e(TAG, "size " + myLatlongs.size() + " \n ");
     }
 
     public double calculateDistance(int rssi, int txPower) {
@@ -116,6 +158,26 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
             double distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111; //badania
             return distance;
         }
+    }
+
+    public double[] trilateration(LatLngSinglton latLngSinglton, double distance) {
+        //  # https://github.com/lemmingapex/trilateration
+        double[][] positions = new double[][]{  {5.0, -6.0},
+                {13.0, -15.0},
+                {21.0, -3.0},
+                {12.4, -21.2}   };
+        double[] distances = new double[]{8.06, 13.97, 23.32, 15.31};
+
+        NonLinearLeastSquaresSolver solver = new NonLinearLeastSquaresSolver(new TrilaterationFunction(positions, distances), new LevenbergMarquardtOptimizer());
+        LeastSquaresOptimizer.Optimum optimum = solver.solve();
+
+        // the answer
+        double[] centroid = optimum.getPoint().toArray();
+
+        // error and geometry information; may throw SingularMatrixException depending the threshold argument provided
+        RealVector standardDeviation = optimum.getSigma(0);
+        RealMatrix covarianceMatrix = optimum.getCovariances(0);
+        return centroid;
     }
 
     //correctly converting string to byte

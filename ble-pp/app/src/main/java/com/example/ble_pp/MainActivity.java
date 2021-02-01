@@ -139,25 +139,6 @@ public class MainActivity extends AppCompatActivity {
             checkPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, PERMISSION_BACKGROUND_LOCATION_CODE);
         }
         checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION, PERMISSION_COARSE_LOCATION_CODE);
-
-
-        //  # https://github.com/lemmingapex/trilateration
-        double[][] positions = new double[][]{  {5.0, -6.0},
-                                                {13.0, -15.0},
-                                                {21.0, -3.0},
-                                                {12.4, -21.2}   };
-        double[] distances = new double[]{8.06, 13.97, 23.32, 15.31};
-
-        NonLinearLeastSquaresSolver solver = new NonLinearLeastSquaresSolver(new TrilaterationFunction(positions, distances), new LevenbergMarquardtOptimizer());
-        LeastSquaresOptimizer.Optimum optimum = solver.solve();
-
-        // the answer
-        double[] centroid = optimum.getPoint().toArray();
-
-        // error and geometry information; may throw SingularMatrixException depending the threshold argument provided
-        RealVector standardDeviation = optimum.getSigma(0);
-        RealMatrix covarianceMatrix = optimum.getCovariances(0);
-
     } // onCreate
 
     @Override
@@ -290,6 +271,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void stopScanning() {
+        myAdapter.convertDataToStringLatLong();
         Toast.makeText(getApplicationContext(), "Stop scanning", Toast.LENGTH_SHORT).show();
         startScanningButton.setVisibility(View.VISIBLE);
         stopScanningButton.setVisibility(View.INVISIBLE);
