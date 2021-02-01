@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
     private final List<ScanResult> scanResultList = new ArrayList<>();
     private final List<ScanFilter> scanFilterList = new ArrayList<>();
 
-    private static final DecimalFormat df = new DecimalFormat("#.##");
+    private static final DecimalFormat df = new DecimalFormat("#.##");          //badania!
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
 
     private final static int REQUEST_ENABLE_BT = 1;

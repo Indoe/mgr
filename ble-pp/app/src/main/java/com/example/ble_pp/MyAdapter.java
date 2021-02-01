@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.os.ParcelUuid;
-import android.os.SystemClock;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,43 +27,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-class LatLngSinglton {
-    private double lattitude;
-    private double longitude;
 
-    public LatLngSinglton(double lattitude, double longitude) {
-        this.lattitude = lattitude;
-        this.longitude = longitude;
-    }
 
-    public double getLattitude() {
-        return lattitude;
-    }
-
-    public void setLattitude(double lattitude) {
-        this.lattitude = lattitude;
-    }
-
-    public double getLongitude() {
-        return longitude;
-    }
-
-    public void setLongitude(double longitude) {
-        this.longitude = longitude;
-    }
-
-    @Override
-    public String toString() {
-        return "LatLngSinglton{" +
-                "lattitude=" + lattitude +
-                ", longitude=" + longitude +
-                '}';
-    }
-}
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
-    ArrayList<LatLngSinglton> myLatlongs = new ArrayList<>();
+    ArrayList<LocationWithDistance> locationWithDistanceList = new ArrayList<>();
     private static final String TAG = "MyAdapter: ";
     private static DecimalFormat df = new DecimalFormat("0.00");
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
@@ -76,6 +43,8 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     byte[] data;
     double distance;
     String[] splited;
+    double latitude;
+    double longitude;
 
     public MyAdapter(Context context, List<ScanResult> scanResultList) {
         super();
@@ -127,21 +96,25 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     }
 
     public void convertDataToStringLatLong() {
-        myLatlongs.clear();
+        locationWithDistanceList.clear();
         for (int position = 0; position < scanResultList.size(); position++) {
+
+            distance = Double.parseDouble(df.format(calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower())).replace(",","."));
 
             data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
             hexToString = new String(data, StandardCharsets.UTF_8);
             splited = hexToString.split("\\s+");
 
-            double latitude = Double.parseDouble(splited[0].replace(",","."));
-            double longitude = Double.parseDouble(splited[1].replace(",","."));
+            latitude = Double.parseDouble(splited[0].replace(",","."));
+            longitude = Double.parseDouble(splited[1].replace(",","."));
 
-            myLatlongs.add( new LatLngSinglton(latitude, longitude));
+            locationWithDistanceList.add( new LocationWithDistance(latitude, longitude, distance));
 
-            Log.e(TAG, "position " + position + " " + myLatlongs.get(position).toString());
+            Log.e(TAG, "position " + position + " " + locationWithDistanceList.get(position).toString());
         }
-        Log.e(TAG, "size " + myLatlongs.size() + " \n ");
+        Log.e(TAG, "size " + locationWithDistanceList.size());
+
+        Log.e(TAG, "Wynik trilateracji: " + Arrays.toString(trilateration(locationWithDistanceList)));
     }
 
     public double calculateDistance(int rssi, int txPower) {
@@ -160,15 +133,22 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
     }
 
-    public double[] trilateration(LatLngSinglton latLngSinglton, double distance) {
+    public double[] trilateration(ArrayList<LocationWithDistance> myLatlongs) {
         //  # https://github.com/lemmingapex/trilateration
-        double[][] positions = new double[][]{  {5.0, -6.0},
-                {13.0, -15.0},
-                {21.0, -3.0},
-                {12.4, -21.2}   };
-        double[] distances = new double[]{8.06, 13.97, 23.32, 15.31};
 
-        NonLinearLeastSquaresSolver solver = new NonLinearLeastSquaresSolver(new TrilaterationFunction(positions, distances), new LevenbergMarquardtOptimizer());
+        double[][] position = new double[myLatlongs.size()][2];
+        for (int i = 0; i < position.length; i++) {
+            position[i] = new double[]{myLatlongs.get(i).getLattitude(), myLatlongs.get(i).getLongitude()};
+        }
+
+        double[] distance = new double[myLatlongs.size()];
+        for (int i = 0; i < distance.length; i++) {
+            distance[i] = myLatlongs.get(i).getDistance();
+        }
+
+        NonLinearLeastSquaresSolver solver = new NonLinearLeastSquaresSolver(
+                new TrilaterationFunction( position, distance ),
+                new LevenbergMarquardtOptimizer()   );
         LeastSquaresOptimizer.Optimum optimum = solver.solve();
 
         // the answer
@@ -177,6 +157,10 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         // error and geometry information; may throw SingularMatrixException depending the threshold argument provided
         RealVector standardDeviation = optimum.getSigma(0);
         RealMatrix covarianceMatrix = optimum.getCovariances(0);
+
+        Log.e(TAG, "standardDeviation " + standardDeviation);
+        Log.e(TAG, "covarianceMatrix " + covarianceMatrix + "\n");
+
         return centroid;
     }
 
