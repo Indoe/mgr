@@ -1,7 +1,9 @@
 package com.example.ble_pp;
 
+import android.annotation.SuppressLint;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
+import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -11,7 +13,9 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -21,11 +25,15 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
     private static final String TAG = "MyAdapter: ";
     private static DecimalFormat df = new DecimalFormat("0.00");
-
+    public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
     private static Comparator<ScanResult> SORTING_COMPARATOR = (lhs, rhs) ->
             lhs.getDevice().getAddress().compareTo(rhs.getDevice().getAddress());
     List<ScanResult> scanResultList;
     Context context;
+    String hexToString;
+    byte[] data;
+    double distance;
+    String[] splited;
 
     public MyAdapter(Context context, List<ScanResult> scanResultList) {
         super();
@@ -41,17 +49,21 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         return new MyViewHolder(view);
     }
 
+    @SuppressLint("SetTextI18n")
     @Override
     public void onBindViewHolder(MyViewHolder myViewHolder, int position) {
+
         myViewHolder.deviceName.setText(scanResultList.get(position).getDevice().getName());
+
         myViewHolder.macAddress.setText(scanResultList.get(position).getDevice().getAddress());
 
-//        long secondSince = calculateTimestamp(scanResultList.get(position).getTimestampNanos());
-//        myViewHolder.timestamp.setText(String.valueOf(secondSince) + " s");
+        data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
+        hexToString = new String(data, StandardCharsets.UTF_8);
+        splited = hexToString.split("\\s+");
+        myViewHolder.data_service.setText("lat: " + splited[0] + " long: " + splited[1]);
 
-        double distance = calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower());
-        myViewHolder.rssi.setText(String.valueOf(df.format(distance)) + " m");
-
+        distance = calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower());
+        myViewHolder.rssi.setText(df.format(distance) + " m");
     }
 
     @Override
@@ -70,16 +82,32 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         scanResultList.add(result);
         Collections.sort(scanResultList, SORTING_COMPARATOR);
         notifyDataSetChanged();
+
+        convertData();
+    }
+
+    public void convertData() {
+        double[][] positions = new double[scanResultList.size()][2];
+        for (int position = 0; position < scanResultList.size(); position++) {
+
+            data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
+            hexToString = new String(data, StandardCharsets.UTF_8);
+            splited = hexToString.split("\\s+");
+
+            double latitude = Double.parseDouble(splited[0].replace(",","."));
+            double longitude = Double.parseDouble(splited[1].replace(",","."));
+
+            positions[position] = new double[]{latitude, longitude};
+
+        }
     }
 
     public double calculateDistance(int rssi, int txPower) {
-
-        if (rssi == 0) {
+        if (rssi == 0)
             return -1.0;
-        }
-        if (txPower == 127) {
+
+        if (txPower == 127)
             txPower = -59;
-        }
 
         double ratio = rssi * 1.0 / txPower;
         if (ratio < 1.0) {
@@ -103,18 +131,11 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
     //check correctly formatted service data (max 31 bytes)
     public String byteArrayToHexString(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < bytes.length; i++) {
-            sb.append(String.format("%02x", bytes[i]));
+        StringBuilder sb = new StringBuilder(bytes.length);
+        for(byte byteChar : bytes) {
+            sb.append(String.format("%02X ", byteChar));
         }
         return sb.toString();
-    }
-
-    public long calculateTimestamp(long timeNanoseconds) {
-
-        long actualTime = System.currentTimeMillis() - TimeUnit.MILLISECONDS.convert(SystemClock.elapsedRealtimeNanos() - timeNanoseconds, TimeUnit.NANOSECONDS);
-//        long actualTime = System.currentTimeMillis() - SystemClock.elapsedRealtime() + timeNanoseconds / 1000000;
-        return actualTime;
     }
 
     public void clearScanResult() {
@@ -122,19 +143,19 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         notifyDataSetChanged();
     }
 
-    public class MyViewHolder extends RecyclerView.ViewHolder {
+    public static class MyViewHolder extends RecyclerView.ViewHolder {
 
-        private TextView deviceName;
-        private TextView macAddress;
-        private TextView rssi;
-        private TextView timestamp;
+        private final TextView deviceName;
+        private final TextView macAddress;
+        private final TextView rssi;
+        private final TextView data_service;
 
         public MyViewHolder(View itemView) {
             super(itemView);
             deviceName = (TextView) itemView.findViewById(R.id.device_name);
             macAddress = (TextView) itemView.findViewById(R.id.mac_address);
             rssi = (TextView) itemView.findViewById(R.id.signal_strength);
-            timestamp = (TextView) itemView.findViewById(R.id.timestamp);
+            data_service = (TextView) itemView.findViewById(R.id.data_service);
         }
     }
 }

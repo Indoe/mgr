@@ -47,7 +47,7 @@
         tools:text="10 m" />
 
     <TextView
-        android:id="@+id/timestamp"
+        android:id="@+id/data_service"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="14sp"
@@ -55,6 +55,6 @@
         app:layout_constraintEnd_toEndOf="@id/signal_strength"
         app:layout_constraintTop_toBottomOf="@id/signal_strength"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="30 s" />
+        tools:text="data" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
