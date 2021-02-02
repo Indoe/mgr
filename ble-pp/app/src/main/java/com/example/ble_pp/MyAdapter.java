@@ -29,7 +29,6 @@ import java.util.Comparator;
 import java.util.List;
 
 
-
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     ArrayList<LocationWithDistance> locationWithDistanceList = new ArrayList<>();
     private static final String TAG = "MyAdapter: ";
@@ -99,16 +98,17 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         locationWithDistanceList.clear();
         for (int position = 0; position < scanResultList.size(); position++) {
 
-            distance = Double.parseDouble(df.format(calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower())).replace(",","."));
+            distance = Double.parseDouble(df.format(calculateDistance(scanResultList.get(position).getRssi(),
+                    scanResultList.get(position).getTxPower())).replace(",", "."));
 
             data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
             hexToString = new String(data, StandardCharsets.UTF_8);
             splited = hexToString.split("\\s+");
 
-            latitude = Double.parseDouble(splited[0].replace(",","."));
-            longitude = Double.parseDouble(splited[1].replace(",","."));
+            latitude = Double.parseDouble(splited[0].replace(",", "."));
+            longitude = Double.parseDouble(splited[1].replace(",", "."));
 
-            locationWithDistanceList.add( new LocationWithDistance(latitude, longitude, distance));
+            locationWithDistanceList.add(new LocationWithDistance(latitude, longitude, distance));
 
             Log.e(TAG, "position " + position + " " + locationWithDistanceList.get(position).toString());
         }
@@ -128,7 +128,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         if (ratio < 1.0) {
             return Math.pow(ratio, 10);
         } else {
-            double distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111; //badania
+            double distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111;                                              //badania!
             return distance;
         }
     }
@@ -147,8 +147,8 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
 
         NonLinearLeastSquaresSolver solver = new NonLinearLeastSquaresSolver(
-                new TrilaterationFunction( position, distance ),
-                new LevenbergMarquardtOptimizer()   );
+                new TrilaterationFunction(position, distance),
+                new LevenbergMarquardtOptimizer());
         LeastSquaresOptimizer.Optimum optimum = solver.solve();
 
         // the answer
@@ -178,7 +178,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     //check correctly formatted service data (max 31 bytes)
     public String byteArrayToHexString(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length);
-        for(byte byteChar : bytes) {
+        for (byte byteChar : bytes) {
             sb.append(String.format("%02X ", byteChar));
         }
         return sb.toString();

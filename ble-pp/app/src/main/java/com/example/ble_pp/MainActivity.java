@@ -21,6 +21,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelUuid;
 import android.util.Log;
 import android.view.View;
@@ -34,13 +35,16 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.lemmingapex.trilateration.NonLinearLeastSquaresSolver;
-import com.lemmingapex.trilateration.TrilaterationFunction;
-
-import org.apache.commons.math3.fitting.leastsquares.LeastSquaresOptimizer;
-import org.apache.commons.math3.fitting.leastsquares.LevenbergMarquardtOptimizer;
-import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.linear.RealVector;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationAvailability;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -68,13 +72,16 @@ public class MainActivity extends AppCompatActivity {
     Button advertisingButton;
     RecyclerView listRecyclerView;
 
+    FusedLocationProviderClient fusedLocationClient;
+    Task<Location> locationTask;
+    LocationRequest locationRequest;
     LocationManager locationManager;
     Location gpsLoc;
 
     private final List<ScanResult> scanResultList = new ArrayList<>();
     private final List<ScanFilter> scanFilterList = new ArrayList<>();
 
-    private static final DecimalFormat df = new DecimalFormat("#.##");          //badania!
+    private static final DecimalFormat df = new DecimalFormat("#.##");                              //badania!
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
 
     private final static int REQUEST_ENABLE_BT = 1;
@@ -93,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
+        btAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
 
         listRecyclerView = findViewById(R.id.RecyclerViewList);
         myAdapter = new MyAdapter(this, scanResultList);
@@ -123,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
+                        fusedLocationClient.removeLocationUpdates(leLocationCallback);
                         Toast.makeText(getApplicationContext(), "Advertising is stopped!", Toast.LENGTH_LONG).show();
                     }
                 }, 60000);
@@ -160,6 +169,8 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{permission},
                     requestCode);
         }
+        else
+            requestLocation();
     }
 
 
@@ -200,10 +211,29 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private final LocationCallback leLocationCallback = new LocationCallback() {
+        @Override
+        public void onLocationResult(LocationResult locationResult) {
+            super.onLocationResult(locationResult);
+            if (locationResult == null) {
+                return;
+            }
+            for (Location location : locationResult.getLocations()) {
+                if (location != null) {
+                    latitude = df.format(location.getLatitude());
+                    longitude = df.format(location.getLongitude());
+                }
+            }
+        }
+
+        @Override
+        public void onLocationAvailability(LocationAvailability locationAvailability) {
+            super.onLocationAvailability(locationAvailability);
+        }
+    };
+
     public void startAdvertising() {
         Toast.makeText(getApplicationContext(), "Start advertising for 1 minute", Toast.LENGTH_SHORT).show();
-
-        btAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
 
         btAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
@@ -212,21 +242,21 @@ public class MainActivity extends AppCompatActivity {
                 .setConnectable(true)
                 .build();
 
-        // #LOCATION
-        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        gpsLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        Log.e(TAG, "lat is " + gpsLoc.getLatitude() + " long is " + gpsLoc.getLongitude());
+
+        getLocation();
+
+        if(latitude.isEmpty() || longitude.isEmpty()) {
+            Toast.makeText(getApplicationContext(), "Get Location FAIL!", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         outputStream = new ByteArrayOutputStream();
-        latitude = df.format(gpsLoc.getLatitude());
-        longitude = df.format(gpsLoc.getLongitude());
-
         try {
             outputStream.write(latitude.getBytes());
             outputStream.write(myAdapter.toByteArray("20")); //spacebar
@@ -281,5 +311,52 @@ public class MainActivity extends AppCompatActivity {
                 btScanner.stopScan(leScanCallback);
             }
         });
+    }
+
+    public void requestLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        else {
+            locationRequest = LocationRequest.create();
+            locationRequest
+                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                    .setInterval(10 * 1000); //1min
+
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+            fusedLocationClient.requestLocationUpdates(locationRequest, leLocationCallback, Looper.getMainLooper());
+        }
+    }
+    public void getLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        else{
+            fusedLocationClient.getLocationAvailability()
+                    .addOnSuccessListener(this, locationAvailability -> {
+                        Log.e(TAG, "Is location available: " + locationAvailability.isLocationAvailable() + "\n");
+                    });
+
+            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                latitude = df.format(location.getLatitude());
+                longitude = df.format(location.getLongitude());
+                Log.e(TAG, "fusedLocationClient -> lat: " + latitude + " long: " + longitude + "\n");
+            });
+
+            fusedLocationClient.getLastLocation().addOnFailureListener(location -> {
+                locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                gpsLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                latitude = df.format(gpsLoc.getLatitude());
+                longitude = df.format(gpsLoc.getLongitude());
+                Log.e(TAG, "locationManager -> lat: " + latitude + " long: " + longitude + "\n");
+            });
+        }
+
     }
 }
