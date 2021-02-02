@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.lemmingapex.trilateration.NonLinearLeastSquaresSolver;
@@ -36,6 +37,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
     private static Comparator<ScanResult> SORTING_COMPARATOR = (lhs, rhs) ->
             lhs.getDevice().getAddress().compareTo(rhs.getDevice().getAddress());
+    AlertDialog.Builder builder;
     List<ScanResult> scanResultList;
     Context context;
     String hexToString;
@@ -114,7 +116,15 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
         Log.e(TAG, "size " + locationWithDistanceList.size());
 
-        Log.e(TAG, "Wynik trilateracji: " + Arrays.toString(trilateration(locationWithDistanceList)));
+        if(locationWithDistanceList.size() >= 2){
+            builder = new AlertDialog.Builder(context);
+            builder.setTitle("Trilateration answer")
+                    .setMessage(Arrays.toString(trilateration(locationWithDistanceList)));
+            AlertDialog alertDialog = builder.create();
+            alertDialog.show();
+            Log.e(TAG, "Wynik trilateracji: " + Arrays.toString(trilateration(locationWithDistanceList)));
+        }
+
     }
 
     public double calculateDistance(int rssi, int txPower) {
@@ -155,11 +165,11 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         double[] centroid = optimum.getPoint().toArray();
 
         // error and geometry information; may throw SingularMatrixException depending the threshold argument provided
-        RealVector standardDeviation = optimum.getSigma(0);
-        RealMatrix covarianceMatrix = optimum.getCovariances(0);
-
-        Log.e(TAG, "standardDeviation " + standardDeviation);
-        Log.e(TAG, "covarianceMatrix " + covarianceMatrix + "\n");
+//        RealVector standardDeviation = optimum.getSigma(0);
+//        RealMatrix covarianceMatrix = optimum.getCovariances(0);
+//
+//        Log.e(TAG, "standardDeviation " + standardDeviation);
+//        Log.e(TAG, "covarianceMatrix " + covarianceMatrix + "\n");
 
         return centroid;
     }

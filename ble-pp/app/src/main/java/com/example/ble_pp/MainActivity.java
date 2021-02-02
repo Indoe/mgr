@@ -41,10 +41,6 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -73,7 +69,6 @@ public class MainActivity extends AppCompatActivity {
     RecyclerView listRecyclerView;
 
     FusedLocationProviderClient fusedLocationClient;
-    Task<Location> locationTask;
     LocationRequest locationRequest;
     LocationManager locationManager;
     Location gpsLoc;
@@ -144,10 +139,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         checkPermission(Manifest.permission.ACCESS_FINE_LOCATION, PERMISSION_FINE_LOCATION_CODE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            checkPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, PERMISSION_BACKGROUND_LOCATION_CODE);
-        }
-        checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION, PERMISSION_COARSE_LOCATION_CODE);
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//            checkPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, PERMISSION_BACKGROUND_LOCATION_CODE);
+//        }
+//        checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION, PERMISSION_COARSE_LOCATION_CODE);
     } // onCreate
 
     @Override
@@ -168,8 +163,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[]{permission},
                     requestCode);
-        }
-        else
+        } else
             requestLocation();
     }
 
@@ -233,6 +227,13 @@ public class MainActivity extends AppCompatActivity {
     };
 
     public void startAdvertising() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "permission not granted");
+        }
+
         Toast.makeText(getApplicationContext(), "Start advertising for 1 minute", Toast.LENGTH_SHORT).show();
 
         btAdvertiseSettings = new AdvertiseSettings.Builder()
@@ -242,18 +243,14 @@ public class MainActivity extends AppCompatActivity {
                 .setConnectable(true)
                 .build();
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-
         getLocation();
 
-        if(latitude.isEmpty() || longitude.isEmpty()) {
-            Toast.makeText(getApplicationContext(), "Get Location FAIL!", Toast.LENGTH_SHORT).show();
-            return;
+        if (latitude == null || longitude == null) {
+            locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            gpsLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            latitude = df.format(gpsLoc.getLatitude());
+            longitude = df.format(gpsLoc.getLongitude());
+            Log.e(TAG, "locationManager -> lat: " + latitude + " long: " + longitude + "\n");
         }
 
         outputStream = new ByteArrayOutputStream();
@@ -318,45 +315,37 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        else {
+            Log.e(TAG, "permission not granted");
+        } else {
             locationRequest = LocationRequest.create();
             locationRequest
                     .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                    .setInterval(10 * 1000); //1min
+                    .setInterval(10 * 1000); //x sekund
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
             fusedLocationClient.requestLocationUpdates(locationRequest, leLocationCallback, Looper.getMainLooper());
         }
     }
+
     public void getLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        else{
-            fusedLocationClient.getLocationAvailability()
-                    .addOnSuccessListener(this, locationAvailability -> {
-                        Log.e(TAG, "Is location available: " + locationAvailability.isLocationAvailable() + "\n");
-                    });
-
+            Log.e(TAG, "permission not granted");
+        } else {
             fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-                latitude = df.format(location.getLatitude());
-                longitude = df.format(location.getLongitude());
-                Log.e(TAG, "fusedLocationClient -> lat: " + latitude + " long: " + longitude + "\n");
+                if (location != null) {
+                    latitude = df.format(location.getLatitude());
+                    longitude = df.format(location.getLongitude());
+                    Log.e(TAG, "fusedLocationClient -> lat: " + latitude + " long: " + longitude + "\n");
+                }
             });
 
-            fusedLocationClient.getLastLocation().addOnFailureListener(location -> {
-                locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                gpsLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                latitude = df.format(gpsLoc.getLatitude());
-                longitude = df.format(gpsLoc.getLongitude());
-                Log.e(TAG, "locationManager -> lat: " + latitude + " long: " + longitude + "\n");
+            fusedLocationClient.getLocationAvailability().
+                    addOnSuccessListener(this, locationAvailability -> {
+                Log.e(TAG, "If true fusedLocationClient, if false locationManager: " + locationAvailability.isLocationAvailable() + "\n");
             });
         }
-
     }
 }
