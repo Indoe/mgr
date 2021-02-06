@@ -11,6 +11,11 @@ public class LocationWithDistance {
         this.distance = distance;
     }
 
+    public LocationWithDistance(double lattitude, double longitude) {
+        this.lattitude = lattitude;
+        this.longitude = longitude;
+    }
+
     public double getLattitude() {
         return lattitude;
     }

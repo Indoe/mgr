@@ -1,6 +1,7 @@
 package com.example.ble_pp;
 
 import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.os.ParcelUuid;
@@ -10,7 +11,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.lemmingapex.trilateration.NonLinearLeastSquaresSolver;
@@ -18,27 +18,27 @@ import com.lemmingapex.trilateration.TrilaterationFunction;
 
 import org.apache.commons.math3.fitting.leastsquares.LeastSquaresOptimizer;
 import org.apache.commons.math3.fitting.leastsquares.LevenbergMarquardtOptimizer;
-import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.linear.RealVector;
 
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
+
     ArrayList<LocationWithDistance> locationWithDistanceList = new ArrayList<>();
     private static final String TAG = "MyAdapter: ";
-    private static DecimalFormat df = new DecimalFormat("0.00");
-    public static final ParcelUuid uuid = ParcelUuid.fromString("0000feaa-0000-1000-8000-00805f9b34fb");
+    private static DecimalFormat df = new DecimalFormat("#.##");
+    public static final ParcelUuid uuid = ParcelUuid.fromString("0000c0fe-0000-1000-8000-00805f9b34fb");
     private static Comparator<ScanResult> SORTING_COMPARATOR = (lhs, rhs) ->
             lhs.getDevice().getAddress().compareTo(rhs.getDevice().getAddress());
-    AlertDialog.Builder builder;
     List<ScanResult> scanResultList;
+    Set<BluetoothDevice> registeredDevices;
     Context context;
     String hexToString;
     byte[] data;
@@ -47,10 +47,11 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     double latitude;
     double longitude;
 
-    public MyAdapter(Context context, List<ScanResult> scanResultList) {
+    public MyAdapter(Context context, List<ScanResult> scanResultList, Set<BluetoothDevice> registeredDevices) {
         super();
         this.context = context;
         this.scanResultList = scanResultList;
+        this.registeredDevices = registeredDevices;
     }
 
 
@@ -65,14 +66,17 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     @Override
     public void onBindViewHolder(MyViewHolder myViewHolder, int position) {
 
+//        myViewHolder.deviceName.setText(scanResultList.get(position).getDevice().getAddress());
         myViewHolder.deviceName.setText(scanResultList.get(position).getDevice().getName());
-
         myViewHolder.macAddress.setText(scanResultList.get(position).getDevice().getAddress());
 
         data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
-        hexToString = new String(data, StandardCharsets.UTF_8);
-        splited = hexToString.split("\\s+");
-        myViewHolder.data_service.setText("lat: " + splited[0] + " long: " + splited[1]);
+        if(data != null){
+            hexToString = new String(data, StandardCharsets.UTF_8);
+            splited = hexToString.split("\\s+");
+            myViewHolder.data_service.setText("lat: " + splited[0] + " long: " + splited[1]);
+        } else
+            myViewHolder.data_service.setText("lat: " + null + " long: " + null);
 
         distance = calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower());
         myViewHolder.rssi.setText(df.format(distance) + " m");
@@ -83,17 +87,28 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         return scanResultList.size();
     }
 
-    public void addScanResult(ScanResult result) {
+    public void addLocation(BluetoothDevice device, byte[] data) {
         for (int position = 0; position < scanResultList.size(); position++) {
-            if (scanResultList.get(position).getDevice().getAddress().equals(result.getDevice().getAddress())) {
+            if(scanResultList.get(position).getDevice().getAddress().equals(device.getAddress()))
+                this.data = data;
+        }
+    }
+
+    public boolean addScanResult(ScanResult result) {
+        for (int position = 0; position < scanResultList.size(); position++) {
+            if (scanResultList.get(position).getDevice().getName().equals(result.getDevice().getName())) {
+//            if (scanResultList.get(position).getDevice().getAddress().equals(result.getDevice().getAddress())) {
                 scanResultList.set(position, result);
                 notifyItemChanged(position);
-                return;
+                return false;
             }
         }
+        Log.e(TAG, result.getDevice().toString());
         scanResultList.add(result);
         Collections.sort(scanResultList, SORTING_COMPARATOR);
+
         notifyDataSetChanged();
+        return true;
     }
 
     public void convertDataToStringLatLong() {
@@ -104,6 +119,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
                     scanResultList.get(position).getTxPower())).replace(",", "."));
 
             data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
+
             hexToString = new String(data, StandardCharsets.UTF_8);
             splited = hexToString.split("\\s+");
 
@@ -116,14 +132,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
         Log.e(TAG, "size " + locationWithDistanceList.size());
 
-        if(locationWithDistanceList.size() >= 2){
-            builder = new AlertDialog.Builder(context);
-            builder.setTitle("Trilateration answer")
-                    .setMessage(Arrays.toString(trilateration(locationWithDistanceList)));
-            AlertDialog alertDialog = builder.create();
-            alertDialog.show();
-            Log.e(TAG, "Wynik trilateracji: " + Arrays.toString(trilateration(locationWithDistanceList)));
-        }
+
 
     }
 
