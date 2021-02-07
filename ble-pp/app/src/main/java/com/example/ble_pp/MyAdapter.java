@@ -28,6 +28,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.commons.math3.util.FastMath.atanh;
+
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
@@ -59,6 +61,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     public MyViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
         LayoutInflater inflater = LayoutInflater.from(context);
         View view = inflater.inflate(R.layout.row_list, viewGroup, false);
+
         return new MyViewHolder(view);
     }
 
@@ -111,6 +114,27 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         return true;
     }
 
+    public double decimalDegree2meters_latitude(double latitude) {
+        double y = Math.log(Math.tan((90 + latitude) * Math.PI / 360)) / (Math.PI / 180);
+        y = y * 20037508.34 / 180;
+        return y;
+    }
+    public double decimalDegree2meters_longitude(double longitude) {
+        double x = longitude * 20037508.34 / 180;
+        return x;
+    }
+
+    public double meters2decimalDegree_latitude(double y) {
+        double latitude = (y / 20037508.34) * 180;
+        latitude = 180/Math.PI * (2 * Math.atan(Math.exp(latitude * Math.PI / 180)) - Math.PI / 2);
+        return latitude;
+    }
+
+    public double meters2decimalDegree_longitude(double x) {
+        double longitude = (x / 20037508.34) * 180;
+        return longitude;
+    }
+
     public void convertDataToStringLatLong() {
         locationWithDistanceList.clear();
         for (int position = 0; position < scanResultList.size(); position++) {
@@ -126,14 +150,15 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
             latitude = Double.parseDouble(splited[0].replace(",", "."));
             longitude = Double.parseDouble(splited[1].replace(",", "."));
 
+            //convert decimal degree to meters for trilateration
+            latitude = decimalDegree2meters_latitude(latitude);
+            longitude = decimalDegree2meters_longitude(longitude);
+
             locationWithDistanceList.add(new LocationWithDistance(latitude, longitude, distance));
 
             Log.e(TAG, "position " + position + " " + locationWithDistanceList.get(position).toString());
         }
         Log.e(TAG, "size " + locationWithDistanceList.size());
-
-
-
     }
 
     public double calculateDistance(int rssi, int txPower) {

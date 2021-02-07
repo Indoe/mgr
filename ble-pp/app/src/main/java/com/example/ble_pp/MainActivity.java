@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationAvailability;
 import com.google.android.gms.location.LocationCallback;
@@ -87,7 +88,6 @@ public class MainActivity extends AppCompatActivity {
     Button startScanningButton;
     Button stopScanningButton;
     Button advertisingButton;
-    Button stopAdvertisingButton;
     Button trilateriationButton;
 
     RecyclerView listRecyclerView;
@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private final Set<BluetoothDevice> registeredDevices = new HashSet<>();
 
     private static final DecimalFormat df = new DecimalFormat("#.#####");                              //7 miejsc //badania!
-    private static final DecimalFormat dftemp = new DecimalFormat("#.##");
+    private static final DecimalFormat dftemp = new DecimalFormat("#.#####");
     public static final ParcelUuid uuid = ParcelUuid.fromString("0000c0fe-0000-1000-8000-00805f9b34fb");
 
     public static final ParcelUuid uuid_characteristic = ParcelUuid.fromString("3032faaa-426b-7261-5074-72616d536557b");
@@ -166,22 +166,12 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Snackbar mySnackbar = Snackbar.make(findViewById(R.id.RecyclerViewList), "Start advertising...", Snackbar.LENGTH_SHORT);
                 mySnackbar.show();
-                advertisingButton.setVisibility(View.INVISIBLE);
-                stopAdvertisingButton.setVisibility(View.VISIBLE);
                 startAdvertising();
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    advertisingButton.setVisibility(View.INVISIBLE);
+                }, 2 * 60 * 1000); // minuty * sekundy * milisekundy
             }
         });
-
-        stopAdvertisingButton = (Button) findViewById(R.id.stopAdvertisingButton);
-        stopAdvertisingButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Snackbar mySnackbar = Snackbar.make(findViewById(R.id.RecyclerViewList), "Stop advertising...", Snackbar.LENGTH_SHORT);
-                mySnackbar.show();
-                stopAdvertising();
-            }
-        });
-        stopAdvertisingButton.setVisibility(View.INVISIBLE);
 
         trilateriationButton = (Button) findViewById(R.id.Trilateration);
         trilateriationButton.setVisibility(View.INVISIBLE);
@@ -290,7 +280,7 @@ public class MainActivity extends AppCompatActivity {
         btAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
-                .setTimeout(0)
+                .setTimeout(2 * 60 * 1000)
                 .setConnectable(true)
                 .build();
 
@@ -311,8 +301,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void stopAdvertising() {
-        advertisingButton.setVisibility(View.VISIBLE);
-        stopAdvertisingButton.setVisibility(View.INVISIBLE);
         btAdvertiser.stopAdvertising(leAdvertiseCallback);
     }
 
@@ -331,6 +319,7 @@ public class MainActivity extends AppCompatActivity {
         myAdapter.clearScanResult();
         startScanningButton.setVisibility(View.INVISIBLE);
         stopScanningButton.setVisibility(View.VISIBLE);
+        trilateriationButton.setVisibility(View.INVISIBLE);
 
         runOnUiThread(() -> {
             btScanner.startScan(scanFilterList, scanSettings, leScanCallback);
@@ -375,12 +364,16 @@ public class MainActivity extends AppCompatActivity {
         if (myAdapter.locationWithDistanceList.size() >= 2) {
             centroid = myAdapter.trilateration(myAdapter.locationWithDistanceList);
 
+            //convert answer from meters to decimal degree
+            centroid[0] = myAdapter.meters2decimalDegree_latitude(centroid[0]);
+            centroid[1] = myAdapter.meters2decimalDegree_longitude(centroid[1]);
+
             tempLat = Double.parseDouble(latitude.replace(",", "."));
             tempLon = Double.parseDouble(longitude.replace(",", "."));
 
             String text = df.format(centroid[0]) + "    " + df.format(centroid[1]) + "\n" + "\n"
                     + "Real location:\n" + latitude + "    " + longitude + "\n" + "\n"
-                    + "measurement error: " +"\n"
+                    + "measurement error: " + "\n"
                     + "lat " + dftemp.format(Math.abs(centroid[0] - tempLat) / tempLat * 100) + "%" + "\n"
                     + "lon " + dftemp.format(Math.abs(centroid[1] - tempLon) / tempLon * 100) + "%";
 
@@ -416,18 +409,19 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "permission not granted");
         } else {
-            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-                if (location != null) {
-                    latitude = df.format(location.getLatitude());
-                    longitude = df.format(location.getLongitude());
-                    Log.e(TAG, "location" + location.toString());
-                    Log.e(TAG, "fusedLocationClient -> lat: " + location.getLatitude() + " long: " + location.getLongitude() + "\n");
-                }
-            });
-
             fusedLocationClient.getLocationAvailability().
                     addOnSuccessListener(this, locationAvailability -> {
-                        Log.e(TAG, "If true fusedLocationClient, if false locationManager: " + locationAvailability.isLocationAvailable() + "\n");
+//                        Log.e(TAG, "If true fusedLocationClient, if false locationManager: " + locationAvailability.isLocationAvailable() + "\n");
+                        if (locationAvailability.isLocationAvailable()) {
+                            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                                if (location != null) {
+                                    latitude = df.format(location.getLatitude());
+                                    longitude = df.format(location.getLongitude());
+                                    Log.e(TAG, "location" + location.toString());
+                                    Log.e(TAG, "fusedLocationClient -> lat: " + location.getLatitude() + " long: " + location.getLongitude() + "\n");
+                                }
+                            });
+                        }
                     });
         }
 
@@ -468,19 +462,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
     ///////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-
 
 
     private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
@@ -740,6 +722,7 @@ public class MainActivity extends AppCompatActivity {
     public void stopClient() {
         bluetoothGatt.close();
     }
+
     public void notifyRegisteredDevices(byte[] data) {
         //wykonuje sie gdy klient wysle lokalizacje
         if (registeredDevices.isEmpty()) {

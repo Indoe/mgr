@@ -47,19 +47,6 @@
         />
 
     <Button style="@style/TextAppearance.AppCompat.Widget.Button.Colored"
-        android:id="@+id/stopAdvertisingButton"
-        android:layout_alignParentLeft="@+id/AdvertisingButton"
-        android:layout_width="wrap_content"
-        android:layout_height="50dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginLeft="20dp"
-        android:layout_marginRight="20dp"
-        android:background="@color/palete3"
-        android:text="Stop Advert"
-        android:padding="10dp"
-        />
-
-    <Button style="@style/TextAppearance.AppCompat.Widget.Button.Colored"
         android:id="@+id/Trilateration"
         android:layout_width="wrap_content"
         android:layout_height="50dp"
