@@ -24,11 +24,8 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.apache.commons.math3.util.FastMath.atanh;
 
 
 public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
@@ -74,15 +71,48 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         myViewHolder.macAddress.setText(scanResultList.get(position).getDevice().getAddress());
 
         data = scanResultList.get(position).getScanRecord().getServiceData(uuid);
-        if(data != null){
+        if (data != null) {
             hexToString = new String(data, StandardCharsets.UTF_8);
             splited = hexToString.split("\\s+");
             myViewHolder.data_service.setText("lat: " + splited[0] + " long: " + splited[1]);
         } else
             myViewHolder.data_service.setText("lat: " + null + " long: " + null);
 
-        distance = calculateDistance(scanResultList.get(position).getRssi(), scanResultList.get(position).getTxPower());
+        distance = calculateDistance(scanResultList.get(position).getRssi(), getTxPower(scanResultList.get(position).getDevice().getName()));
         myViewHolder.rssi.setText(df.format(distance) + " m");
+    }
+
+    public int getTxPower(String device) {
+        //calibrate for 2m
+        //zwiekszajac liczbe dystans maleje
+        //zmniejszajac liczbe dystans rosnie
+        int x;
+        switch (device) {
+            case "1":
+                x = -70;
+                break;
+            case "2":
+                x = -75;
+                break;
+            case "3":
+                x = -77;
+                break;
+            case "4":
+                x = -78;
+                break;
+            case "5":
+                x = -54;
+                break;
+            case "6":
+                x = -76;
+                break;
+            case "7":
+                x = -73;
+                break;
+            default:
+                x = -69;
+        }
+        return x;
     }
 
     @Override
@@ -92,7 +122,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
     public void addLocation(BluetoothDevice device, byte[] data) {
         for (int position = 0; position < scanResultList.size(); position++) {
-            if(scanResultList.get(position).getDevice().getAddress().equals(device.getAddress()))
+            if (scanResultList.get(position).getDevice().getAddress().equals(device.getAddress()))
                 this.data = data;
         }
     }
@@ -119,6 +149,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         y = y * 20037508.34 / 180;
         return y;
     }
+
     public double decimalDegree2meters_longitude(double longitude) {
         double x = longitude * 20037508.34 / 180;
         return x;
@@ -126,7 +157,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
 
     public double meters2decimalDegree_latitude(double y) {
         double latitude = (y / 20037508.34) * 180;
-        latitude = 180/Math.PI * (2 * Math.atan(Math.exp(latitude * Math.PI / 180)) - Math.PI / 2);
+        latitude = 180 / Math.PI * (2 * Math.atan(Math.exp(latitude * Math.PI / 180)) - Math.PI / 2);
         return latitude;
     }
 
@@ -166,14 +197,13 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
             return -1.0;
 
         if (txPower == 127)
-            txPower = -59;
+            txPower = -75;                                                                           //skalibrowac dla kazdego telefonu inny.....
 
         double ratio = rssi * 1.0 / txPower;
         if (ratio < 1.0) {
             return Math.pow(ratio, 10);
         } else {
-            double distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111;                                              //badania!
-            return distance;
+            return (0.89976) * Math.pow(ratio, 7.7095) + 0.111;
         }
     }
 

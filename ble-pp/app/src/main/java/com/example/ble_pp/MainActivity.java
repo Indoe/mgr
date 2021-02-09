@@ -5,18 +5,14 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
-import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
-import android.bluetooth.le.AdvertisingSet;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -45,7 +41,6 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationAvailability;
 import com.google.android.gms.location.LocationCallback;
@@ -58,13 +53,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -167,9 +158,9 @@ public class MainActivity extends AppCompatActivity {
                 Snackbar mySnackbar = Snackbar.make(findViewById(R.id.RecyclerViewList), "Start advertising...", Snackbar.LENGTH_SHORT);
                 mySnackbar.show();
                 startAdvertising();
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    advertisingButton.setVisibility(View.INVISIBLE);
-                }, 2 * 60 * 1000); // minuty * sekundy * milisekundy
+//                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+//                    advertisingButton.setVisibility(View.INVISIBLE);
+//                }, 2 * 60 * 1000); // minuty * sekundy * milisekundy
             }
         });
 
@@ -279,8 +270,8 @@ public class MainActivity extends AppCompatActivity {
     public void startAdvertising() {
         btAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
-                .setTimeout(2 * 60 * 1000)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW)
+//                .setTimeout(2 * 60 * 1000)
                 .setConnectable(true)
                 .build();
 
@@ -433,7 +424,6 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "locationManager -> lat: " + latitude + " long: " + longitude + "\n");
         }
 
-
         try {
             outputStream.write(latitude.getBytes());
             outputStream.write(myAdapter.toByteArray("20")); //spacebar
@@ -444,306 +434,4 @@ public class MainActivity extends AppCompatActivity {
 
         return outputStream;
     }
-
-    public void sendLocation() {
-        location = bluetoothGatt
-                .getService(uuid_service.getUuid())
-                .getCharacteristic(uuid_location.getUuid());
-
-        outputStream = getLocation();
-
-        if (outputStream.size() <= 0) {
-            Log.e(TAG, "outputStream.size() in sendLocation i 0");
-            return;
-        }
-
-        location.setValue(outputStream.toByteArray());
-        bluetoothGatt.writeCharacteristic(location);
-    }
-
-
-    ///////////////////////////////////////
-
-
-    private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-//            super.onConnectionStateChange(gatt, status, newState);
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.e(TAG, "Connected to GATT client. Attempting to start service discovery");
-
-                if (status == BluetoothGatt.STATE_CONNECTED) {
-                    Log.e(TAG, "bluetoothGattCallback onConnectionStateChange STATE_CONNECTED");
-                }
-                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                    @Override
-                    public void run() {
-                        gatt.discoverServices();
-                        Log.e(TAG, "Discover Services started ");
-                    }
-                });
-
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.e(TAG, "Disconnected from GATT client");
-            }
-        }
-
-        @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            Log.e(TAG, "onServicesDiscovered received: " + status);
-            gattConnected = true;
-//            super.onServicesDiscovered(gatt, status);
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                service = gatt.getService(uuid_service.getUuid());
-                if (service != null) {
-                    characteristic = service.getCharacteristic(uuid_characteristic.getUuid());
-                    if (characteristic != null) {
-                        gatt.setCharacteristicNotification(characteristic, true);
-                        descriptor = characteristic.getDescriptor(uuid_descriptor.getUuid());
-                        if (descriptor != null) {
-                            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                            gatt.writeDescriptor(descriptor);
-                        }
-                    }
-                }
-
-            } else
-                Log.e(TAG, "onServicesDiscovered received: " + status);
-        }
-
-        @Override
-        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
-            Log.e(TAG, "onDescriptorWrite received: " + status);
-//            super.onDescriptorWrite(gatt, descriptor, status);
-            if (uuid_descriptor.getUuid().equals(descriptor.getUuid())) {
-                characteristic = gatt.getService(uuid_service.getUuid()).getCharacteristic(uuid_characteristic.getUuid());
-                gatt.readCharacteristic(characteristic);
-            }
-        }
-
-        @Override
-        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            Log.e(TAG, "onCharacteristicRead received: " + status);
-//            super.onCharacteristicRead(gatt, characteristic, status);
-            readCounterCharacteristic(characteristic);
-        }
-
-        @Override
-        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            Log.e(TAG, "onCharacteristicChanged: " + Arrays.toString(characteristic.getValue()));
-//            super.onCharacteristicChanged(gatt, characteristic);
-            readCounterCharacteristic(characteristic);
-        }
-
-        //tu odczytujemy  i akutalizujemy lokalizację!
-        private void readCounterCharacteristic(BluetoothGattCharacteristic characteristic) {
-            Log.e(TAG, "readCounterCharacteristic: " + Arrays.toString(characteristic.getValue()));
-            if (uuid_characteristic.getUuid().equals(characteristic.getUuid())) {
-
-                data = characteristic.getValue(); //pobranie lokalizacji
-
-//                int value = Ints.fromByteArray(data);     //aktualizajca lokalizacji
-//                mListener.onCounterRead(value);
-            }
-        }
-
-    }; //# bluetoothGattCallback #
-
-    private void discoverServices() {
-
-        if (!gattConnected) { //just a boolean
-            new Handler(Looper.getMainLooper()).post(new Runnable() {
-                @Override
-                public void run() {
-                    bluetoothGatt.discoverServices();
-                }
-            });
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    discoverServices();
-                }
-            }, 5000);
-        }
-    }
-
-    private final BluetoothGattServerCallback gattServerCallback = new BluetoothGattServerCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
-//            super.onConnectionStateChange(device, status, newState);
-            Log.e(TAG, "onConnectionStateChange status: " + status + ", newState: " + newState);
-
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.e(TAG, "BluetoothDevice [server] CONNECTED: " + device);
-
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.e(TAG, "BluetoothDevice [server] DISCONNECTED: " + device);
-                // Remove device from any active subscriptions
-                registeredDevices.remove(device);
-            }
-        }
-
-        @Override
-        public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
-//            super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
-            if (uuid_characteristic.getUuid().equals(characteristic.getUuid())) {
-
-//                Log.e(TAG, "characteristic " + myAdapter.byteArrayToHexString(characteristic.getValue()));
-//                Log.e(TAG, "descriptor " + Arrays.toString(characteristic.getDescriptor(uuid_descriptor.getUuid()).getValue()));
-
-                //zwrocic liczbe ktora jest  zapisana
-//                byte[] data = outputStream.toByteArray();
-
-//                data = getLocation().toByteArray();
-
-                gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, characteristic.getValue());
-            } else {
-                Log.e(TAG, "invalid characteristic");
-            }
-        }
-
-        @Override
-        public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic,
-                                                 boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
-//            super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
-            if (uuid_location.getUuid().equals(characteristic.getUuid())) {
-
-                //dostaje lokalizacje i coś z nią robię
-                myAdapter.addLocation(device, value);
-
-                //aktualizujemy tu lokalizacje i wysylamy wszystkim info o jej zmianie
-//                notifyRegisteredDevices(value);                                       //gdy client wysle swoja lokalizacje
-            } else {
-                Log.e(TAG, "Invalid Characteristic Write: " + characteristic.getUuid());
-                gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null);
-            }
-        }
-
-        @Override
-        public void onDescriptorReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattDescriptor descriptor) {
-//            super.onDescriptorReadRequest(device, requestId, offset, descriptor);
-
-            if (uuid_descriptor.getUuid().equals(descriptor.getUuid())) {
-                Log.e(TAG, "Config descriptor read request");
-                byte[] returnValue;
-                if (registeredDevices.contains(device)) {
-                    returnValue = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE;
-                } else {
-                    returnValue = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE;
-                }
-                gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, returnValue);
-            }
-            /*else if (DESCRIPTOR_USER_DESC.equals(descriptor.getUuid())) {
-                Log.d(TAG, "User description descriptor read request");
-                byte[] returnValue = AwesomenessProfile.getUserDescription(descriptor.getCharacteristic().getUuid());
-                returnValue = Arrays.copyOfRange(returnValue, offset, returnValue.length);
-                mBluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, returnValue);
-            }*/
-            else {
-                Log.e(TAG, "Unknown descriptor read request");
-                gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null);
-            }
-        }
-
-        @Override
-        public void onDescriptorWriteRequest(BluetoothDevice device, int requestId, BluetoothGattDescriptor descriptor,
-                                             boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
-//            super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value);
-
-            if (uuid_descriptor.getUuid().equals(descriptor.getUuid())) {
-                if (Arrays.equals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE, value)) {
-                    //nie wykonuje sie ;C
-                    registeredDevices.add(device);
-                } else if (Arrays.equals(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE, value)) {
-                    registeredDevices.remove(device);
-                }
-
-                if (responseNeeded) {
-                    gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null);
-                } else {
-                    Log.e(TAG, "Unknown descriptor write request");
-                    if (responseNeeded) {
-                        gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null);
-                    }
-                }
-            }
-        }
-
-
-    }; //# gattServerCallback #
-
-    private BluetoothGattService createService() {
-        service = new BluetoothGattService(uuid_service.getUuid(), BluetoothGattService.SERVICE_TYPE_PRIMARY);
-
-        characteristic = new BluetoothGattCharacteristic(
-                uuid_characteristic.getUuid(),
-                BluetoothGattCharacteristic.PROPERTY_READ,
-                BluetoothGattCharacteristic.PERMISSION_READ);
-
-        descriptor = new BluetoothGattDescriptor(
-                uuid_descriptor.getUuid(),
-                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
-        );
-        characteristic.addDescriptor(descriptor);
-
-        location = new BluetoothGattCharacteristic(
-                uuid_location.getUuid(),
-                BluetoothGattCharacteristic.PERMISSION_READ | BluetoothGattCharacteristic.PERMISSION_WRITE,
-                BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ);
-
-        service.addCharacteristic(location);
-        service.addCharacteristic(characteristic);
-
-        return service;
-    }
-
-    public void startServer() {
-        gattServer = btManager.openGattServer(this, gattServerCallback);
-        gattServer.addService(createService());
-        Log.e(TAG, "starting server");
-    }
-
-    public void stopServer() {
-        gattServer.close();
-    }
-
-    public void startClient(ScanResult result) {
-        bluetoothDevice = btAdapter.getRemoteDevice(result.getDevice().getAddress()); //get address
-        bluetoothGatt = bluetoothDevice.connectGatt(this, false, bluetoothGattCallback);
-        if (bluetoothGatt == null) {
-            Log.e(TAG, "Unable to create GATT client");
-            return;
-        }
-//        discoverServices();
-        bluetoothGatt.getServices();
-//        sendLocation(); //is wrong
-    }
-
-    public void stopClient() {
-        bluetoothGatt.close();
-    }
-
-    public void notifyRegisteredDevices(byte[] data) {
-        //wykonuje sie gdy klient wysle lokalizacje
-        if (registeredDevices.isEmpty()) {
-            Log.e(TAG, "No subscribers registered");
-            return;
-        }
-
-        Log.e(TAG, "Sending update to " + registeredDevices.size() + " subscribers");
-        for (BluetoothDevice device : registeredDevices) {
-            BluetoothGattCharacteristic counterCharacteristic = gattServer
-                    .getService(uuid_service.getUuid())
-                    .getCharacteristic(uuid_characteristic.getUuid());
-
-            sendLocation();
-
-            //get location from device
-            data = outputStream.toByteArray();
-            counterCharacteristic.setValue(data);
-
-            gattServer.notifyCharacteristicChanged(device, counterCharacteristic, false);
-        }
-    }
-
 }
